@@ -181,22 +181,6 @@ def asn1time(cert_time):
 
     return cert_time
 
-# Issue #9415: Ubuntu hijacks their OpenSSL and forcefully disables SSLv2
-def skip_if_broken_ubuntu_ssl(func):
-    if hasattr(ssl, 'PROTOCOL_SSLv2'):
-        @functools.wraps(func)
-        def f(*args, **kwargs):
-            try:
-                ssl.SSLContext(ssl.PROTOCOL_SSLv2)
-            except ssl.SSLError:
-                if (ssl.OPENSSL_VERSION_INFO == (0, 9, 8, 15, 15) and
-                    platform.linux_distribution() == ('debian', 'squeeze/sid', '')):
-                    raise unittest.SkipTest("Patched Ubuntu OpenSSL breaks behaviour")
-            return func(*args, **kwargs)
-        return f
-    else:
-        return func
-
 needs_sni = unittest.skipUnless(ssl.HAS_SNI, "SNI support needed for this test")
 
 
@@ -975,7 +959,6 @@ class BasicSocketTests(unittest.TestCase):
 
 class ContextTests(unittest.TestCase):
 
-    @skip_if_broken_ubuntu_ssl
     def test_constructor(self):
         for protocol in PROTOCOLS:
             ssl.SSLContext(protocol)
@@ -984,7 +967,6 @@ class ContextTests(unittest.TestCase):
         self.assertRaises(ValueError, ssl.SSLContext, -1)
         self.assertRaises(ValueError, ssl.SSLContext, 42)
 
-    @skip_if_broken_ubuntu_ssl
     def test_protocol(self):
         for proto in PROTOCOLS:
             ctx = ssl.SSLContext(proto)
@@ -1018,7 +1000,6 @@ class ContextTests(unittest.TestCase):
         self.assertIn('AES256-GCM-SHA384', names)
         self.assertIn('AES128-GCM-SHA256', names)
 
-    @skip_if_broken_ubuntu_ssl
     def test_options(self):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         # OP_ALL | OP_NO_SSLv2 | OP_NO_SSLv3 is the default value
@@ -1333,7 +1314,6 @@ class ContextTests(unittest.TestCase):
         with self.assertRaises(ssl.SSLError) as cm:
             ctx.load_dh_params(CERTFILE)
 
-    @skip_if_broken_ubuntu_ssl
     def test_session_stats(self):
         for proto in PROTOCOLS:
             ctx = ssl.SSLContext(proto)
@@ -2554,7 +2534,6 @@ def try_protocol_combo(server_protocol, client_protocol, expect_success,
 
 class ThreadedTests(unittest.TestCase):
 
-    @skip_if_broken_ubuntu_ssl
     def test_echo(self):
         """Basic test of an SSL client connecting to a server"""
         if support.verbose:
@@ -2716,10 +2695,7 @@ class ThreadedTests(unittest.TestCase):
     def test_ecc_cert(self):
         client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         client_context.load_verify_locations(SIGNING_CA)
-        client_context.set_ciphers(
-            'TLS13-AES-128-GCM-SHA256:TLS13-CHACHA20-POLY1305-SHA256:'
-            'ECDHE:ECDSA:!NULL:!aRSA'
-        )
+        client_context.set_ciphers('ECDHE:ECDSA:!NULL:!aRSA')
         hostname = SIGNED_CERTFILE_ECC_HOSTNAME
 
         server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -2923,7 +2899,6 @@ class ThreadedTests(unittest.TestCase):
                     self.assertIn(msg, repr(e))
                     self.assertIn('certificate verify failed', repr(e))
 
-    @skip_if_broken_ubuntu_ssl
     @unittest.skipUnless(hasattr(ssl, 'PROTOCOL_SSLv2'),
                          "OpenSSL is compiled without SSLv2 support")
     def test_protocol_sslv2(self):
@@ -2947,7 +2922,6 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_TLS, False,
                            client_options=ssl.OP_NO_TLSv1)
 
-    @skip_if_broken_ubuntu_ssl
     def test_PROTOCOL_TLS(self):
         """Connecting to an SSLv23 server with various client options"""
         if support.verbose:
@@ -2987,7 +2961,6 @@ class ThreadedTests(unittest.TestCase):
                            server_options=ssl.OP_NO_TLSv1)
 
 
-    @skip_if_broken_ubuntu_ssl
     @unittest.skipUnless(hasattr(ssl, 'PROTOCOL_SSLv3'),
                          "OpenSSL is compiled without SSLv3 support")
     def test_protocol_sslv3(self):
@@ -3007,7 +2980,6 @@ class ThreadedTests(unittest.TestCase):
             try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_TLS,
                                False, client_options=ssl.OP_NO_SSLv2)
 
-    @skip_if_broken_ubuntu_ssl
     def test_protocol_tlsv1(self):
         """Connecting to a TLSv1 server with various client options"""
         if support.verbose:
@@ -3022,7 +2994,6 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLS, False,
                            client_options=ssl.OP_NO_TLSv1)
 
-    @skip_if_broken_ubuntu_ssl
     @unittest.skipUnless(hasattr(ssl, "PROTOCOL_TLSv1_1"),
                          "TLS version 1.1 not supported.")
     def test_protocol_tlsv1_1(self):
@@ -3042,7 +3013,6 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_TLSv1, False)
         try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLSv1_1, False)
 
-    @skip_if_broken_ubuntu_ssl
     @unittest.skipUnless(hasattr(ssl, "PROTOCOL_TLSv1_2"),
                          "TLS version 1.2 not supported.")
     def test_protocol_tlsv1_2(self):
@@ -3466,17 +3436,16 @@ class ThreadedTests(unittest.TestCase):
                 sock.do_handshake()
             self.assertEqual(cm.exception.errno, errno.ENOTCONN)
 
-    def test_default_ciphers(self):
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-        try:
-            # Force a set of weak ciphers on our client context
-            context.set_ciphers("DES")
-        except ssl.SSLError:
-            self.skipTest("no DES cipher available")
-        with ThreadedEchoServer(CERTFILE,
-                                ssl_version=ssl.PROTOCOL_TLS,
-                                chatty=False) as server:
-            with context.wrap_socket(socket.socket()) as s:
+    def test_no_shared_ciphers(self):
+        client_context, server_context, hostname = testing_context()
+        # OpenSSL enables all TLS 1.3 ciphers, enforce TLS 1.2 for test
+        client_context.options |= ssl.OP_NO_TLSv1_3
+        # Force different suites on client and master
+        client_context.set_ciphers("AES128")
+        server_context.set_ciphers("AES256")
+        with ThreadedEchoServer(context=server_context) as server:
+            with client_context.wrap_socket(socket.socket(),
+                                            server_hostname=hostname) as s:
                 with self.assertRaises(OSError):
                     s.connect((HOST, server.port))
         self.assertIn("no shared cipher", server.conn_errors[0])
@@ -3517,9 +3486,9 @@ class ThreadedTests(unittest.TestCase):
             with context.wrap_socket(socket.socket()) as s:
                 s.connect((HOST, server.port))
                 self.assertIn(s.cipher()[0], {
-                    'TLS13-AES-256-GCM-SHA384',
-                    'TLS13-CHACHA20-POLY1305-SHA256',
-                    'TLS13-AES-128-GCM-SHA256',
+                    'TLS_AES_256_GCM_SHA384',
+                    'TLS_CHACHA20_POLY1305_SHA256',
+                    'TLS_AES_128_GCM_SHA256',
                 })
                 self.assertEqual(s.version(), 'TLSv1.3')
 
@@ -3925,23 +3894,20 @@ class ThreadedTests(unittest.TestCase):
 
     def test_shared_ciphers(self):
         client_context, server_context, hostname = testing_context()
-        if ssl.OPENSSL_VERSION_INFO >= (1, 0, 2):
-            client_context.set_ciphers("AES128:AES256")
-            server_context.set_ciphers("AES256")
-            alg1 = "AES256"
-            alg2 = "AES-256"
-        else:
-            client_context.set_ciphers("AES:3DES")
-            server_context.set_ciphers("3DES")
-            alg1 = "3DES"
-            alg2 = "DES-CBC3"
+        client_context.set_ciphers("AES128:AES256")
+        server_context.set_ciphers("AES256")
+        expected_algs = [
+            "AES256", "AES-256",
+            # TLS 1.3 ciphers are always enabled
+            "TLS_CHACHA20", "TLS_AES",
+        ]
 
         stats = server_params_test(client_context, server_context,
                                    sni_name=hostname)
         ciphers = stats['server_shared_ciphers'][0]
         self.assertGreater(len(ciphers), 0)
         for name, tls_version, bits in ciphers:
-            if not alg1 in name.split("-") and alg2 not in name:
+            if not any(alg in name for alg in expected_algs):
                 self.fail(name)
 
     def test_read_write_after_close_raises_valuerror(self):
@@ -4087,24 +4053,16 @@ def test_main(verbose=False):
     if support.verbose:
         import warnings
         plats = {
-            'Linux': platform.linux_distribution,
             'Mac': platform.mac_ver,
             'Windows': platform.win32_ver,
         }
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                'ignore',
-                r'dist\(\) and linux_distribution\(\) '
-                'functions are deprecated .*',
-                PendingDeprecationWarning,
-            )
-            for name, func in plats.items():
-                plat = func()
-                if plat and plat[0]:
-                    plat = '%s %r' % (name, plat)
-                    break
-            else:
-                plat = repr(platform.platform())
+        for name, func in plats.items():
+            plat = func()
+            if plat and plat[0]:
+                plat = '%s %r' % (name, plat)
+                break
+        else:
+            plat = repr(platform.platform())
         print("test_ssl: testing with %r %r" %
             (ssl.OPENSSL_VERSION, ssl.OPENSSL_VERSION_INFO))
         print("          under %s" % plat)

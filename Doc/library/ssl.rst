@@ -169,11 +169,6 @@ purposes.
 
      3DES was dropped from the default cipher string.
 
-   .. versionchanged:: 3.7
-
-     TLS 1.3 cipher suites TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384,
-     and TLS_CHACHA20_POLY1305_SHA256 were added to the default cipher string.
-
 
 Exceptions
 ^^^^^^^^^^
@@ -802,6 +797,15 @@ Constants
    .. deprecated:: 3.7
       The option is deprecated since OpenSSL 1.1.0. It was added to 2.7.15,
       3.6.3 and 3.7.0 for backwards compatibility with OpenSSL 1.0.2.
+
+.. data:: OP_NO_RENEGOTIATION
+
+   Disable all renegotiation in TLSv1.2 and earlier. Do not send
+   HelloRequest messages, and ignore renegotiation requests via ClientHello.
+
+   This option is only available with OpenSSL 1.1.0h and later.
+
+   .. versionadded:: 3.7
 
 .. data:: OP_CIPHER_SERVER_PREFERENCE
 
@@ -1592,6 +1596,9 @@ to speed up repeated connections from the same clients.
       when connected, the :meth:`SSLSocket.cipher` method of SSL sockets will
       give the currently selected cipher.
 
+      OpenSSL 1.1.1 has TLS 1.3 cipher suites enabled by default. The suites
+      cannot be disabled with :meth:`~SSLContext.set_ciphers`.
+
 .. method:: SSLContext.set_alpn_protocols(protocols)
 
    Specify which protocols the socket should advertise during the SSL/TLS
@@ -2158,9 +2165,9 @@ Visual inspection shows that the certificate does identify the desired service
                 (('commonName', 'www.python.org'),)),
     'subjectAltName': (('DNS', 'www.python.org'),
                        ('DNS', 'python.org'),
-                       ('DNS', 'pypi.python.org'),
+                       ('DNS', 'pypi.org'),
                        ('DNS', 'docs.python.org'),
-                       ('DNS', 'testpypi.python.org'),
+                       ('DNS', 'testpypi.org'),
                        ('DNS', 'bugs.python.org'),
                        ('DNS', 'wiki.python.org'),
                        ('DNS', 'hg.python.org'),
